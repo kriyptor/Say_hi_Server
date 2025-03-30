@@ -3,6 +3,63 @@ const Users = require(`../Models/users-model`);
 const { v4: uuidv4 } = require('uuid');
 const { Op } = require(`sequelize`);
 
+exports.getPrivateChats = async (req, res) => {
+    try {
+        const currentUser = req.user.id;
+
+        const interactions = await Messages.findAll({
+            where :{
+                isGroupMessage: false,
+                [Op.or] : [
+                    { senderId: currentUser },
+                    { receiverId: currentUser }
+                ]
+            },
+
+            attributes: [`senderId`, `receiverId`],
+
+            include: [
+                { model: Users, as: `Sender`, attributes: [`id`, `name`] },
+                { model: Users, as: `Receiver`, attributes: [`id`, `name`] },
+            ],
+
+            group: [`senderId`, `receiverId`],
+
+        });
+
+        const uniqueUsers = new Set(); // Use Set to avoid duplicates
+        const userList = []; // Final array for response
+
+        interactions.forEach(data => {
+            if (data.senderId !== currentUser) {
+                const userId = data.senderId;
+                if (!uniqueUsers.has(userId)) {
+                    uniqueUsers.add(userId);
+                    userList.push({  id: data.senderId,  name: data.Sender.name });
+                }
+            } else {
+                const userId = data.receiverId;
+                if (!uniqueUsers.has(userId)) {
+                    uniqueUsers.add(userId);
+                    userList.push({ id: data.receiverId, name: data.Receiver.name });
+                }
+            }
+        });
+
+
+        res.status(200).json({ data : userList });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ 
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+}
+
+
 exports.getConversations = async (req, res) => {
     try {
         
@@ -11,8 +68,6 @@ exports.getConversations = async (req, res) => {
         const senderUser = req.user.id;
 
         const userExists = await Users.findByPk(receiverUser);
-
-        console.log(receiverUser, userExists, senderUser);
 
         if(!userExists){
             return res.status(404).json({

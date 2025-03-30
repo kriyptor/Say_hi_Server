@@ -7,6 +7,8 @@ const router = express.Router();
 
 router.get('/get-messages', authenticate, privateChatController.getConversations);
 
+router.get('/get-private-chat', authenticate, privateChatController.getPrivateChats);
+
 router.post('/post-messages', authenticate, privateChatController.sendMessage);
 
 router.post('/create-group', authenticate,  groupChatController.createGroup);
