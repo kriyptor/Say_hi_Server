@@ -3,6 +3,8 @@ const Users = require("../Models/users-model");
 const jwt = require(`jsonwebtoken`);
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
+const { Op } = require(`sequelize`);
+
 
 function isStringInvalid(string) {
     return string === undefined || string.length === 0;
@@ -101,7 +103,37 @@ exports.loginUser = async (req, res) => {
 
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ 
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+}
 
+exports.getAllUsers = async (req, res) =>{
+    try {
+        const currentUser = req.user.id;
+        const userDetails = await Users.findAll({ 
+            attributes : [`id`, `name`, `email`, `phoneNumber`],
+            where : { id : { [Op.ne] : currentUser } } 
+        });
+
+        if(!userDetails){
+            return res.status(404).json({
+                success: false,
+                message: "No Users Found"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Users retrieved!",
+            data: userDetails
+        })
+
+    } catch (error) {
+        console.log(error);
         return res.status(500).json({ 
             success: false,
             message: 'Internal server error',

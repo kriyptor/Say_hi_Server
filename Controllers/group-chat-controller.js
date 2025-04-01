@@ -7,6 +7,57 @@ const { v4: uuidv4 } = require('uuid');
 const { Op } = require(`sequelize`);
 
 
+exports.getAllGroups = async (req, res) => {
+  try {
+    const currentUser = req.user.id;
+    const groups = await Groups.findAll({
+      include: [
+        {
+          model: Users,
+          as: "Admin",
+          attributes: ["id", "name"],
+        },
+        {
+          model: Users,
+          as: "members",
+          through: {
+            attributes: [],
+          },
+          attributes: ["id", "name"],
+        },
+      ],
+
+      attributes : [`id`, `name`, `adminId`],
+
+      where: {
+        [Op.or]: [
+          { "$members.id$": currentUser },
+          { adminId: currentUser }
+        ]
+      },
+
+
+    });
+
+
+    return res.status(200).json({
+      success: true,
+      message: "Groups retrieved successfully",
+      data: groups,
+    });
+
+  } catch (error) {
+
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+
 exports.createGroup = async (req, res) => {
     
     const transaction = await db.transaction();
@@ -66,10 +117,10 @@ exports.createGroup = async (req, res) => {
         //retrieve group member details
         const groupWithMembers = await Groups.findAll({
             where : { id: newGroup.id },
-            include: [
+           /*  include: [
                 { model: Users, as: 'Admin', attributes: ['id', 'name'] },
                 { model: Users, as: 'members', through: { attributes: [] }, attributes: ['id', 'name'] }
-            ]
+            ] */
         });
 
         return res.status(201).json({
@@ -128,7 +179,8 @@ exports.sendGroupMessage = async (req, res) => {
         });
 
         return res.status(201).json({
-            data : messageWithSender
+            success: true,
+            message: `Message Sent!`
         })
 
 
@@ -145,9 +197,11 @@ exports.sendGroupMessage = async (req, res) => {
 
 exports.getAllGroupMessages = async (req, res) => {
     try {
-        const { groupId } = req.body;
+        const groupId = req.query.groupId;
 
-        const senderId = req.user.id;
+        const currentUser = req.user.id;
+
+        console.log(groupId, currentUser)
 
         const isGroupExist = await Groups.findByPk(groupId);
 
@@ -156,14 +210,13 @@ exports.getAllGroupMessages = async (req, res) => {
         }
 
         const isMember = await GroupMembers.findOne({
-            where : { groupId: groupId, userId: senderId }
+            where : { groupId: groupId, userId: currentUser }
         });
 
         if(!isMember){
             return res.status(403).json({ message: `You are not member of this group` });
         }
 
-        const newGrpMsgId = uuidv4();
 
         const allGroupMessage = await Messages.findAll({
           where: {
@@ -176,8 +229,17 @@ exports.getAllGroupMessages = async (req, res) => {
           ]
         });
 
+        const formattedGroupMessages = allGroupMessage.map(message => ({
+            id: message.id,
+            content: message.messageContent,
+            senderId: message.senderId,
+            createdAt: message.createdAt,
+            senderName: message.senderId === currentUser ? `You` : message.Sender.name,
+        }));
+
         return res.status(200).json({
-            data : allGroupMessage
+            success: true,
+            data : formattedGroupMessages
         })
 
     } catch (error) {

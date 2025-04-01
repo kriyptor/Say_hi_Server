@@ -65,7 +65,7 @@ exports.getConversations = async (req, res) => {
         
         const receiverUser  = req.query.receiverUser;
 
-        const senderUser = req.user.id;
+        const currentUser = req.user.id;
 
         const userExists = await Users.findByPk(receiverUser);
 
@@ -80,8 +80,8 @@ exports.getConversations = async (req, res) => {
             where: {
                 isGroupMessage: false,
                 [Op.or] : [
-                    { senderId: senderUser, receiverId: receiverUser },
-                    { senderId: receiverUser, receiverId: senderUser },
+                    { senderId: currentUser, receiverId: receiverUser },
+                    { senderId: receiverUser, receiverId: currentUser },
                 ]
             },
             order: [[`createdAt`, `ASC`]],
@@ -91,9 +91,18 @@ exports.getConversations = async (req, res) => {
             ]
         });
 
+        const formattedMessages = messages.map(message => ({
+            id: message.id,
+            content: message.messageContent,
+            senderId: message.senderId,
+            receiverId: message.receiverId,
+            createdAt: message.createdAt,
+            senderName: message.senderId === currentUser ? `You` : message.Sender.name,
+        }));
+
         return res.status(200).json({
             success: true,
-            chatData: messages
+            chatData: formattedMessages
         });
 
     } catch (error) {
